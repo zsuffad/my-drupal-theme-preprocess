@@ -1,0 +1,130 @@
+<?php
+
+/**
+ * @file
+ * Functions to support theming in the THEME_NAME theme.
+ */
+
+use Drupal\Component\Utility\Html;
+
+/**
+ * Unset unnecessary headers.
+ */
+function THEME_NAME_page_attachments_alter(&$page) {
+
+  $meta_tags = array('system_meta_generator');
+
+  foreach ($page['#attached']['html_head'] as $key => $value) {
+    if (in_array($value[1], $meta_tags)) {
+      unset($page['#attached']['html_head'][$key]);
+    }
+  }
+}
+
+/**
+ * Implements hook_preprocess(&$variables, $hook).
+ */
+function THEME_NAME_preprocess(&$variables, $hook) {
+
+  // Set base path variable.
+  $variables['base_path'] = base_path();
+
+  // Get view mode & assign variable.
+  $view_mode = $variables['elements']['#view_mode'];
+  $variables['view_mode'] = $view_mode;
+}
+
+/**
+ * Implements hook_preprocess_HOOK() for html.html.twig.
+ */
+function THEME_NAME_preprocess_html(&$variables) {
+
+  $path = \Drupal::service('path.current')->getPath();
+  $alias = trim(\Drupal::service('path.alias_manager')->getAliasByPath($path), '/');
+
+
+  // Alias path class.
+  $alias_class = preg_replace("/\//", '-', $alias);
+  if (!empty($alias_class) && strpos($alias_class, 'node') !== 0) {
+    $variables['attributes']['class'][] = Html::cleanCssIdentifier('alias--' . $alias_class);
+  }
+
+  // If is homepage.
+  $variables['is_front'] = \Drupal::service('path.matcher')->isFrontPage();
+  $variables['attributes']['class'][] = \Drupal::service('path.matcher')->isFrontPage() ? 'frontpage' : '';
+  
+  // Node type class.
+  $variables['attributes']['class'][] = isset($variables['node_type']) ? 'nodetype--' . $variables['node_type'] : '';
+  
+  // Logged in class.
+  $variables['attributes']['class'][] = $variables['logged_in'] ? 'logged-in' : 'logged-out';
+
+  $current_uri = \Drupal::request()->getRequestUri();
+  $route = \Drupal::routeMatch()->getRouteName();
+}
+
+/**
+ * Implements hook_preprocess_HOOK() for page.html.twig.
+ */
+function THEME_NAME_preprocess_page(&$variables) {
+
+  $current_uri = \Drupal::request()->getRequestUri();
+  $route = \Drupal::routeMatch()->getRouteName();
+
+  $variables['zsd']['route'] = $route;
+  $variables['zsd']['uri'] = $current_uri;
+
+  $variables['#attached']['library'][] = 'fermeshop/global_js';
+
+  // Language variable for template lang manipulations
+  $language_id = \Drupal::languageManager()->getCurrentLanguage()->getId();
+  $variables['my_language_id'] = $language_id;
+
+  // PAGE TITLE
+  $request = \Drupal::request();
+  $route_match = \Drupal::routeMatch();
+  $page_title = \Drupal::service('title_resolver')->getTitle($request, $route_match->getRouteObject());
+  $variables['page_title'] = $page_title;
+
+  /* Attache library to frontpage */
+  $variables['page']['#cache']['contexts'][] = 'route';
+  if (\Drupal::service('path.matcher')->isFrontPage()) {
+    $variables['#attached']['library'][] = 'THEME_NAME/LIBRARY_NAME';
+  }
+
+  /* LIBRARIES ATTACHED TO VIEWS */
+  // view: Muvesz es kurator
+  if (strpos($route, 'view.VIEW_NAME') === 0) {
+    $variables['#attached']['library'][] = 'THEME_NAME/LIBRARY_NAME';
+  }
+
+}
+
+/**
+ * Implements hook_preprocess_HOOK() for node.html.twig.
+ */
+function THEME_NAME_preprocess_node(&$variables) {
+
+  // Helper variables for multiple nodes.
+  if (!empty($variables['elements']['#entity_type'])) {
+    $variables['attributes']['class'][] = Html::cleanCssIdentifier('entity--type-' . $variables['elements']['#entity_type']);
+  }
+}
+
+
+/**
+ * Implements template_preprocess_block().
+ */
+function THEME_NAME_preprocess_block(&$variables) {
+
+  // Custom block type helper classes.
+  if (isset($variables['elements']['content']['#block_content'])) {
+    $bundle = $variables['elements']['content']['#block_content']->bundle();
+    $bundle_class = str_replace('_', '-', $bundle);
+
+    if (isset($variables['attributes']['class'])) {
+      $variables['attributes']['class'][] = Html::cleanCssIdentifier('block--bundle-' . $bundle_class);
+      $variables['attributes']['data-bundle-class'] = $bundle_class;
+    }
+  }
+}
